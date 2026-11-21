@@ -3,7 +3,6 @@ use crate::boid::Boid;
 pub struct Flock {
     boids: Vec<Boid>,
 
-    protected_range: f32,
     protected_range_sqrd: f32,
     visual_range: f32,
     visual_range_sqrd: f32,
@@ -34,7 +33,6 @@ impl Flock {
     ) -> Self {
         Self {
             boids,
-            protected_range,
             protected_range_sqrd: protected_range * protected_range,
             visual_range,
             visual_range_sqrd: visual_range * visual_range,
@@ -48,7 +46,7 @@ impl Flock {
         }
     }
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         let mut states = Vec::with_capacity(self.boids.len());
 
         // Calculate the environment around the boid
@@ -81,10 +79,10 @@ impl Flock {
         for (boid, mut state) in &mut self.boids.iter_mut().zip(states) {
             if state.neighboring_boids > 0 {
                 // Calculate averages
-                state.x_pos_avg = state.x_pos_avg / state.neighboring_boids as f32;
-                state.y_pos_avg = state.y_pos_avg / state.neighboring_boids as f32;
-                state.x_vel_avg = state.x_vel_avg / state.neighboring_boids as f32;
-                state.x_vel_avg = state.x_vel_avg / state.neighboring_boids as f32;
+                state.x_pos_avg /= state.neighboring_boids as f32;
+                state.y_pos_avg /= state.neighboring_boids as f32;
+                state.x_vel_avg /= state.neighboring_boids as f32;
+                state.y_vel_avg /= state.neighboring_boids as f32;
 
                 boid.vx = boid.vx
                     + (state.x_pos_avg - boid.x) * self.centering_factor
@@ -102,12 +100,14 @@ impl Flock {
 
             // Clamp the boid's speed
             let speed = (boid.vx * boid.vx + boid.vy * boid.vy).sqrt();
-            if speed < self.min_speed {
-                boid.vx = boid.vx / speed * self.min_speed;
-                boid.vy = boid.vy / speed * self.min_speed;
-            } else if speed > self.max_speed {
-                boid.vx = boid.vx / speed * self.max_speed;
-                boid.vy = boid.vy / speed * self.max_speed;
+            if speed > 0.0 {
+                if speed < self.min_speed {
+                    boid.vx = boid.vx / speed * self.min_speed;
+                    boid.vy = boid.vy / speed * self.min_speed;
+                } else if speed > self.max_speed {
+                    boid.vx = boid.vx / speed * self.max_speed;
+                    boid.vy = boid.vy / speed * self.max_speed;
+                }
             }
 
             // Move the boid
@@ -115,13 +115,21 @@ impl Flock {
             boid.y += boid.vy;
         }
     }
+
+    pub fn boids(&self) -> &Vec<Boid> {
+        &self.boids
+    }
 }
 
 impl Default for Flock {
     fn default() -> Self {
+        let mut boids = Vec::with_capacity(200);
+        for _ in 0..200 {
+            boids.push(Boid::random(800.0, 600.0));
+        }
+
         Self {
-            boids: vec![Boid::default(); 200],
-            protected_range: 8.0,
+            boids,
             protected_range_sqrd: 8.0 * 8.0,
             visual_range: 40.0,
             visual_range_sqrd: 40.0 * 40.0,

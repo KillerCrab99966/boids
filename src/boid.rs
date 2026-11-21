@@ -1,3 +1,5 @@
+use rand::random_range;
+
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Boid {
     pub x: f32,
@@ -7,7 +9,12 @@ pub struct Boid {
 }
 
 impl Boid {
-    pub fn new(x: f32, y: f32, vx: f32, vy: f32) -> Self {
-        Self { x, y, vx, vy }
+    pub fn random(x_max: f32, y_max: f32) -> Self {
+        Self {
+            x: random_range(0.0..x_max),
+            y: random_range(0.0..y_max),
+            vx: random_range(-2.0..2.0),
+            vy: random_range(-2.0..2.0),
+        }
     }
 }
