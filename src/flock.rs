@@ -3,23 +3,180 @@ use crate::boid::Boid;
 pub struct Flock {
     boids: Vec<Boid>,
 
-    protected_range: u32,
-    visible_range: u32,
+    protected_range: f32,
+    protected_range_sqrd: f32,
+    visual_range: f32,
+    visual_range_sqrd: f32,
 
-    avoid_factor: u32,
-    matching_factor: u32,
-    centering_factor: u32,
-    turn_factor: u32,
+    avoid_factor: f32,
+    matching_factor: f32,
+    centering_factor: f32,
+    turn_factor: f32,
 
     margins: Margins,
 
-    max_speed: u32,
-    min_speed: u32,
+    max_speed: f32,
+    min_speed: f32,
 }
 
-enum Margins {
-    Top(u32),
-    Right(u32),
-    Bottom(u32),
-    Left(u32),
+impl Flock {
+    pub fn new(
+        boids: Vec<Boid>,
+        protected_range: f32,
+        visual_range: f32,
+        avoid_factor: f32,
+        matching_factor: f32,
+        centering_factor: f32,
+        turn_factor: f32,
+        margins: Margins,
+        max_speed: f32,
+        min_speed: f32,
+    ) -> Self {
+        Self {
+            boids,
+            protected_range,
+            protected_range_sqrd: protected_range * protected_range,
+            visual_range,
+            visual_range_sqrd: visual_range * visual_range,
+            avoid_factor,
+            matching_factor,
+            centering_factor,
+            turn_factor,
+            margins,
+            max_speed,
+            min_speed,
+        }
+    }
+
+    fn update(&mut self) {
+        let mut states = Vec::with_capacity(self.boids.len());
+
+        // Calculate the environment around the boid
+        for boid in &self.boids {
+            let mut state = State::new();
+            for other_boid in &self.boids {
+                let dx = boid.x - other_boid.x;
+                let dy = boid.y - other_boid.y;
+
+                if dx.abs() < self.visual_range && dy.abs() < self.visual_range {
+                    let squared_dist = dx * dx + dy * dy;
+
+                    if squared_dist < self.protected_range_sqrd {
+                        state.close_dx += dx;
+                        state.close_dy += dy;
+                    } else if squared_dist < self.visual_range_sqrd {
+                        state.x_pos_avg += other_boid.x;
+                        state.y_pos_avg += other_boid.y;
+                        state.x_vel_avg += other_boid.vx;
+                        state.y_vel_avg += other_boid.vy;
+
+                        state.neighboring_boids += 1;
+                    }
+                }
+            }
+            states.push(state);
+        }
+
+        // Update the boid's velocity and position
+        for (boid, mut state) in &mut self.boids.iter_mut().zip(states) {
+            if state.neighboring_boids > 0 {
+                // Calculate averages
+                state.x_pos_avg = state.x_pos_avg / state.neighboring_boids as f32;
+                state.y_pos_avg = state.y_pos_avg / state.neighboring_boids as f32;
+                state.x_vel_avg = state.x_vel_avg / state.neighboring_boids as f32;
+                state.x_vel_avg = state.x_vel_avg / state.neighboring_boids as f32;
+
+                boid.vx = boid.vx
+                    + (state.x_pos_avg - boid.x) * self.centering_factor
+                    + (state.x_vel_avg - boid.vx) * self.matching_factor;
+
+                boid.vy = boid.vy
+                    + (state.y_pos_avg - boid.y) * self.centering_factor
+                    + (state.y_vel_avg - boid.vy) * self.matching_factor;
+            }
+
+            boid.vx += state.close_dx * self.avoid_factor;
+            boid.vy += state.close_dy * self.avoid_factor;
+
+            // TODO: Margins
+
+            // Clamp the boid's speed
+            let speed = (boid.vx * boid.vx + boid.vy * boid.vy).sqrt();
+            if speed < self.min_speed {
+                boid.vx = boid.vx / speed * self.min_speed;
+                boid.vy = boid.vy / speed * self.min_speed;
+            } else if speed > self.max_speed {
+                boid.vx = boid.vx / speed * self.max_speed;
+                boid.vy = boid.vy / speed * self.max_speed;
+            }
+
+            // Move the boid
+            boid.x += boid.vx;
+            boid.y += boid.vy;
+        }
+    }
+}
+
+impl Default for Flock {
+    fn default() -> Self {
+        Self {
+            boids: vec![Boid::default(); 200],
+            protected_range: 8.0,
+            protected_range_sqrd: 8.0 * 8.0,
+            visual_range: 40.0,
+            visual_range_sqrd: 40.0 * 40.0,
+            avoid_factor: 0.05,
+            matching_factor: 0.05,
+            centering_factor: 0.0005,
+            turn_factor: 0.2,
+            margins: Margins::default(),
+            max_speed: 6.0,
+            min_speed: 3.0,
+        }
+    }
+}
+
+pub struct Margins {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+}
+
+impl Default for Margins {
+    fn default() -> Self {
+        Self {
+            top: 100.0,
+            right: 100.0,
+            bottom: 100.0,
+            left: 100.0,
+        }
+    }
+}
+
+pub struct State {
+    x_pos_avg: f32,
+    y_pos_avg: f32,
+
+    x_vel_avg: f32,
+    y_vel_avg: f32,
+
+    close_dx: f32,
+    close_dy: f32,
+
+    neighboring_boids: u32,
+}
+
+impl State {
+    pub fn new() -> Self {
+        Self {
+            x_pos_avg: 0.0,
+            y_pos_avg: 0.0,
+            x_vel_avg: 0.0,
+            y_vel_avg: 0.0,
+            close_dx: 0.0,
+            close_dy: 0.0,
+            neighboring_boids: 0,
+        }
+    }
 }
