@@ -9,12 +9,12 @@ pub struct Boid {
 }
 
 impl Boid {
-    pub fn random(x_max: f32, y_max: f32) -> Self {
+    pub fn random(max_x: f32, max_y: f32, max_speed: f32) -> Self {
         Self {
-            x: random_range(0.0..x_max),
-            y: random_range(0.0..y_max),
-            vx: random_range(-2.0..2.0),
-            vy: random_range(-2.0..2.0),
+            x: random_range(0.0..max_x),
+            y: random_range(0.0..max_y),
+            vx: random_range(-max_speed..max_speed),
+            vy: random_range(-max_speed..max_speed),
         }
     }
 }

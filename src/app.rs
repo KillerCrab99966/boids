@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{num::NonZeroU32, sync::Arc};
 
 use softbuffer::{Context, Surface};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
@@ -12,18 +12,7 @@ use crate::flock::Flock;
 pub struct App {
     window: Option<Arc<Window>>,
     graphics: Option<GraphicsContext>,
-    flock: Flock,
-}
-
-struct GraphicsContext {
-    context: Context<Arc<Window>>,
-    surface: Surface<Arc<Window>, Arc<Window>>,
-}
-
-impl GraphicsContext {
-    fn new(context: Context<Arc<Window>>, surface: Surface<Arc<Window>, Arc<Window>>) -> Self {
-        Self { context, surface }
-    }
+    pub flock: Flock,
 }
 
 impl ApplicationHandler for App {
@@ -42,11 +31,14 @@ impl ApplicationHandler for App {
             if size.width > 0 && size.height > 0 {
                 surface
                     .resize(
-                        std::num::NonZeroU32::new(size.width).unwrap(),
-                        std::num::NonZeroU32::new(size.height).unwrap(),
+                        NonZeroU32::new(size.width).unwrap(),
+                        NonZeroU32::new(size.height).unwrap(),
                     )
                     .unwrap();
             }
+
+            self.flock.margins.width = size.width as f32;
+            self.flock.margins.height = size.height as f32;
 
             self.graphics = Some(GraphicsContext::new(context, surface));
             self.window = Some(window);
@@ -76,11 +68,14 @@ impl ApplicationHandler for App {
                     graphics
                         .surface
                         .resize(
-                            std::num::NonZeroU32::new(size.width).unwrap(),
-                            std::num::NonZeroU32::new(size.height).unwrap(),
+                            NonZeroU32::new(size.width).unwrap(),
+                            NonZeroU32::new(size.height).unwrap(),
                         )
                         .unwrap();
                 }
+
+                self.flock.margins.width = size.width as f32;
+                self.flock.margins.height = size.height as f32;
             }
             WindowEvent::RedrawRequested => {
                 let Some(graphics) = &mut self.graphics else {
@@ -93,6 +88,7 @@ impl ApplicationHandler for App {
                 }
 
                 self.flock.update();
+
                 let mut pixmap = Pixmap::new(size.width, size.height).unwrap();
                 pixmap.fill(Color::TRANSPARENT);
 
@@ -130,5 +126,16 @@ impl ApplicationHandler for App {
             }
             _ => (),
         }
+    }
+}
+
+struct GraphicsContext {
+    context: Context<Arc<Window>>,
+    surface: Surface<Arc<Window>, Arc<Window>>,
+}
+
+impl GraphicsContext {
+    fn new(context: Context<Arc<Window>>, surface: Surface<Arc<Window>, Arc<Window>>) -> Self {
+        Self { context, surface }
     }
 }

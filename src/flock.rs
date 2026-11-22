@@ -12,7 +12,7 @@ pub struct Flock {
     centering_factor: f32,
     turn_factor: f32,
 
-    margins: Margins,
+    pub margins: Margins,
 
     max_speed: f32,
     min_speed: f32,
@@ -60,8 +60,14 @@ impl Flock {
                     let squared_dist = dx * dx + dy * dy;
 
                     if squared_dist < self.protected_range_sqrd {
-                        state.close_dx += dx;
-                        state.close_dy += dy;
+                        if squared_dist > 0.0 {
+                            let dist = squared_dist.sqrt();
+                            state.close_dx += (dx / dist) / dist;
+                            state.close_dy += (dy / dist) / dist;
+                        } else {
+                            state.close_dx += 0.1;
+                            state.close_dy += 0.1;
+                        }
                     } else if squared_dist < self.visual_range_sqrd {
                         state.x_pos_avg += other_boid.x;
                         state.y_pos_avg += other_boid.y;
@@ -84,19 +90,23 @@ impl Flock {
                 state.x_vel_avg /= state.neighboring_boids as f32;
                 state.y_vel_avg /= state.neighboring_boids as f32;
 
-                boid.vx = boid.vx
-                    + (state.x_pos_avg - boid.x) * self.centering_factor
+                boid.vx += (state.x_pos_avg - boid.x) * self.centering_factor
                     + (state.x_vel_avg - boid.vx) * self.matching_factor;
 
-                boid.vy = boid.vy
-                    + (state.y_pos_avg - boid.y) * self.centering_factor
+                boid.vy += (state.y_pos_avg - boid.y) * self.centering_factor
                     + (state.y_vel_avg - boid.vy) * self.matching_factor;
             }
 
             boid.vx += state.close_dx * self.avoid_factor;
             boid.vy += state.close_dy * self.avoid_factor;
 
-            // TODO: Margins
+            match self.margins.outside(boid.x, boid.y) {
+                MarginBounds::Top => boid.vy += self.turn_factor,
+                MarginBounds::Right => boid.vx -= self.turn_factor,
+                MarginBounds::Bottom => boid.vy -= self.turn_factor,
+                MarginBounds::Left => boid.vx += self.turn_factor,
+                MarginBounds::NotOutside => (),
+            }
 
             // Clamp the boid's speed
             let speed = (boid.vx * boid.vx + boid.vy * boid.vy).sqrt();
@@ -123,43 +133,67 @@ impl Flock {
 
 impl Default for Flock {
     fn default() -> Self {
-        let mut boids = Vec::with_capacity(200);
-        for _ in 0..200 {
-            boids.push(Boid::random(800.0, 600.0));
+        let boid_count = 800;
+        let max_speed = 6.0;
+        let mut boids = Vec::with_capacity(boid_count);
+        for _ in 0..boid_count {
+            boids.push(Boid::random(800.0, 600.0, max_speed));
         }
 
         Self {
             boids,
-            protected_range_sqrd: 8.0 * 8.0,
-            visual_range: 40.0,
-            visual_range_sqrd: 40.0 * 40.0,
+            protected_range_sqrd: 25.0 * 25.0,
+            visual_range: 60.0,
+            visual_range_sqrd: 60.0 * 60.0,
             avoid_factor: 0.05,
             matching_factor: 0.05,
-            centering_factor: 0.0005,
+            centering_factor: 0.00005,
             turn_factor: 0.2,
             margins: Margins::default(),
-            max_speed: 6.0,
+            max_speed,
             min_speed: 3.0,
         }
     }
 }
 
 pub struct Margins {
-    top: f32,
-    right: f32,
-    bottom: f32,
-    left: f32,
+    pub width: f32,
+    pub height: f32,
+    pub inset: f32,
+}
+
+impl Margins {
+    pub fn outside(&self, x: f32, y: f32) -> MarginBounds {
+        if y < self.inset {
+            MarginBounds::Top
+        } else if x > self.width - self.inset {
+            MarginBounds::Right
+        } else if y > self.height - self.inset {
+            MarginBounds::Bottom
+        } else if x < self.inset {
+            MarginBounds::Left
+        } else {
+            MarginBounds::NotOutside
+        }
+    }
 }
 
 impl Default for Margins {
     fn default() -> Self {
         Self {
-            top: 100.0,
-            right: 100.0,
-            bottom: 100.0,
-            left: 100.0,
+            width: 800.0,
+            height: 600.0,
+            inset: 100.0,
         }
     }
+}
+
+pub enum MarginBounds {
+    Top,
+    Right,
+    Bottom,
+    Left,
+    NotOutside,
 }
 
 pub struct State {
